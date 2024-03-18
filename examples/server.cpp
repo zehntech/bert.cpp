@@ -1,6 +1,7 @@
 #include "bert.h"
 #include "ggml.h"
 
+#include <thread>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -97,25 +98,31 @@ int main(int argc, char ** argv) {
     std::cout << "Server running on port " << params.port << " with " << params.n_threads << " threads" << std::endl;
     int n_embd = bert_n_embd(bctx);
 
-    while(true) {
-        std::cout << "Waiting for a client" << std::endl;
-        if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t *)&addrlen)) < 0) {
-            std::cerr << "Accept failed" << std::endl;
-            return -1;
-        }
-        std::cout << "New connection" << std::endl;
-        send(new_socket, (const char *) & n_embd, sizeof(int), 0);
-        while(true) {
-            std::string string_in = receive_string(new_socket);
-            if (string_in.empty()) {
-                break;
-            }
-            std::vector<float> embeddings = std::vector<float>(n_embd);
-            bert_encode(bctx, params.n_threads, string_in.data(), embeddings.data());
-            send_floats(new_socket, embeddings);
-        }
-        close(new_socket);
+    while (true) {
+       std::cout << "Waiting for a client" << std::endl;
+       if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t *)&addrlen)) < 0) {
+           std::cerr << "Accept failed" << std::endl;
+           return -1;
+       }
+       std::cout << "New connection" << std::endl;
+
+    // Create a new thread to handle the connection
+      std::thread([&bctx, new_socket, n_embd, &params]() {
+        // Process the connection
+          std::string string_in;
+          while (true) {
+              string_in = receive_string(new_socket);
+              if (string_in.empty()) {
+                  break;
+              }
+              std::vector<float> embeddings(n_embd);
+              bert_encode(bctx, params.n_threads, string_in.data(), embeddings.data());
+              send_floats(new_socket, embeddings);
+          }
+          close(new_socket);
+      }).detach(); // Detach the thread so it runs independently
     }
+
     close(server_fd);
 #if WIN32
     WSACleanup();

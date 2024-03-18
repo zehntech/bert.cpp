@@ -685,6 +685,7 @@ struct bert_ctx * bert_load_from_file(const char *fname)
 
         // TODO: Max tokens should be a param?
         int32_t N = new_bert->model.hparams.n_max_tokens;
+        N *= 2;
         new_bert->mem_per_input = 1.1 * (new_bert->mem_per_token * N); // add 10% to account for ggml object overhead
 
     }
@@ -693,7 +694,7 @@ struct bert_ctx * bert_load_from_file(const char *fname)
     return new_bert;
 }
 
-void bert_resize_ctx(bert_ctx * ctx, int32_t new_size) {    
+void bert_resize_ctx(bert_ctx * ctx, int32_t new_size) {
     int64_t buf_size_new = ctx->mem_per_input * new_size;
 
     // TODO: Max memory should be a param? Now just 1 GB
